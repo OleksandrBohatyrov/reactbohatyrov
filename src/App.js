@@ -1,58 +1,166 @@
-import { useRef } from 'react';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 
 function App() {
-    const [prices, setPrices] = useState([]);
-    const [chosenCountry, setChosenCountry] = useState("ee");
-    const [start, setStart] = useState("");
-    const [end, setEnd] = useState("");
-    const startRef = useRef();
-    const endRef = useRef();
+    const [kasutajad, setKasutajad] = useState([]);
+    const [uusKasutaja, setUusKasutaja] = useState({
+        kasutajanimi: '',
+        parool: '',
+        eesnimi: '',
+        perenimi: '',
+    });
+    const [editMode, setEditMode] = useState(false);
+    const [kasutajaToEdit, setKasutajaToEdit] = useState(null);
 
+    // Получить список пользователей с API
     useEffect(() => {
-        if (start !== "" && end !== "") {
-            fetch("https://localhost:7198/nordpool/" + chosenCountry + "/" + start + "/" + end)
-                .then(res => res.json())
-                .then(json => {
-                    setPrices(json);
-                });
-        }
-    }, [chosenCountry, start, end]);
+        fetch('https://localhost:7198/api/kasutaja')
+            .then((response) => response.json())
+            .then((data) => setKasutajad(data))
+            .catch((error) => console.error('Viga:', error));
+    }, []);
 
-    function updateStart() {
-        const startIso = new Date(startRef.current.value).toISOString();
-        setStart(startIso);
-    }
+    // Добавить нового пользователя
+    const lisaKasutaja = (e) => {
+        e.preventDefault();
 
-    function updateEnd() {
-        const endIso = new Date(endRef.current.value).toISOString();
-        setEnd(endIso);
-    }
+        fetch('https://localhost:7198/api/kasutaja', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(uusKasutaja),
+        })
+            .then((response) => response.json())
+            .then((newUser) => {
+                setKasutajad([...kasutajad, newUser]);
+                setUusKasutaja({ kasutajanimi: '', parool: '', eesnimi: '', perenimi: '' }); // Очистить форму
+            })
+            .catch((error) => console.error('Viga:', error));
+    };
+
+    // Удалить пользователя
+    const kustutaKasutaja = (id) => {
+        fetch(`https://localhost:7198/api/kasutaja/${id}`, {
+            method: 'DELETE',
+        })
+            .then(() => {
+                setKasutajad(kasutajad.filter((kasutaja) => kasutaja.id !== id));
+            })
+            .catch((error) => console.error('Viga:', error));
+    };
+
+    // Обновить пользователя
+    const uuendaKasutaja = (e) => {
+        e.preventDefault();
+
+        fetch(`https://localhost:7198/api/kasutaja/${kasutajaToEdit.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(kasutajaToEdit),
+        })
+            .then(() => {
+                setKasutajad(kasutajad.map((kasutaja) =>
+                    kasutaja.id === kasutajaToEdit.id ? kasutajaToEdit : kasutaja
+                ));
+                setEditMode(false);
+                setKasutajaToEdit(null);
+            })
+            .catch((error) => console.error('Viga:', error));
+    };
+
+    // Включить режим редактирования
+    const startEditing = (kasutaja) => {
+        setEditMode(true);
+        setKasutajaToEdit({ ...kasutaja });
+    };
 
     return (
-        <div>
-            <button onClick={() => setChosenCountry("fi")}>Soome</button>
-            <button onClick={() => setChosenCountry("ee")}>Eesti</button>
-            <button onClick={() => setChosenCountry("lv")}>Läti</button>
-            <button onClick={() => setChosenCountry("lt")}>Leedu</button>
-            <input ref={startRef} onChange={updateStart} type="datetime-local" />
-            <input ref={endRef} onChange={updateEnd} type="datetime-local" />
-            {prices.length > 0 &&
-                <table style={{marginLeft: "100px"}}>
-                    <thead>
-                    <th style={{border: "1px solid #ddd", padding: "12px", backgroundColor: "#04AA6D"}}>Ajatempel</th>
-                    <th style={{border: "1px solid #ddd", padding: "12px", backgroundColor: "#04AA6D"}}>Hind</th>
-                    </thead>
-                    <tbody>
-                    <td style={{position: "absolute", left: "30px"}}>{chosenCountry}</td>
-                    {prices.map(data =>
-                        <tr key={data.timestamp}>
-                            <td style={{border: "1px solid #ddd", padding: "8px"}}>{new Date(data.timestamp * 1000).toISOString()}</td>
-                            <td style={{border: "1px solid #ddd", padding: "8px"}}>{data.price}</td>
-                        </tr>)}
-                    </tbody>
-                </table>}
+        <div className="App">
+            <h1>Kasutajate loend</h1>
+            <ul>
+                {kasutajad.map((kasutaja) => (
+                    <li key={kasutaja.id}>
+                        {kasutaja.eesnimi} {kasutaja.perenimi} ({kasutaja.kasutajanimi})
+                        <button onClick={() => kustutaKasutaja(kasutaja.id)}>Kustuta</button>
+                        <button onClick={() => startEditing(kasutaja)}>Redigeeri</button>
+                    </li>
+                ))}
+            </ul>
+
+            {editMode ? (
+                <>
+                    <h2>Redigeeri kasutaja</h2>
+                    <form onSubmit={uuendaKasutaja}>
+                        <input
+                            type="text"
+                            placeholder="Kasutajanimi"
+                            value={kasutajaToEdit.kasutajanimi}
+                            onChange={(e) =>
+                                setKasutajaToEdit({ ...kasutajaToEdit, kasutajanimi: e.target.value })
+                            }
+                        />
+                        <input
+                            type="password"
+                            placeholder="Parool"
+                            value={kasutajaToEdit.parool}
+                            onChange={(e) =>
+                                setKasutajaToEdit({ ...kasutajaToEdit, parool: e.target.value })
+                            }
+                        />
+                        <input
+                            type="text"
+                            placeholder="Nimi"
+                            value={kasutajaToEdit.eesnimi}
+                            onChange={(e) =>
+                                setKasutajaToEdit({ ...kasutajaToEdit, eesnimi: e.target.value })
+                            }
+                        />
+                        <input
+                            type="text"
+                            placeholder="Perenimi"
+                            value={kasutajaToEdit.perenimi}
+                            onChange={(e) =>
+                                setKasutajaToEdit({ ...kasutajaToEdit, perenimi: e.target.value })
+                            }
+                        />
+                        <button type="submit">Uuendama</button>
+                    </form>
+                </>
+            ) : (
+                <>
+                    <h2>Lisa uus kasutaja</h2>
+                    <form onSubmit={lisaKasutaja}>
+                        <input
+                            type="text"
+                            placeholder="Kasutajanimi"
+                            value={uusKasutaja.kasutajanimi}
+                            onChange={(e) => setUusKasutaja({ ...uusKasutaja, kasutajanimi: e.target.value })}
+                        />
+                        <input
+                            type="password"
+                            placeholder="Parool"
+                            value={uusKasutaja.parool}
+                            onChange={(e) => setUusKasutaja({ ...uusKasutaja, parool: e.target.value })}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Nimi"
+                            value={uusKasutaja.eesnimi}
+                            onChange={(e) => setUusKasutaja({ ...uusKasutaja, eesnimi: e.target.value })}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Perenimi"
+                            value={uusKasutaja.perenimi}
+                            onChange={(e) => setUusKasutaja({ ...uusKasutaja, perenimi: e.target.value })}
+                        />
+                        <button type="submit">Lisa</button>
+                    </form>
+                </>
+            )}
         </div>
     );
 }
