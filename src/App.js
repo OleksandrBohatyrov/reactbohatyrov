@@ -1,166 +1,113 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import UserList from './components/UserList';
+import ProductList from './components/ProductList';
+import AddUser from './components/AddUser';
+import AddProduct from './components/AddProduct';
+import ProductActions from './components/ProductActions';
 
 function App() {
-    const [kasutajad, setKasutajad] = useState([]);
-    const [uusKasutaja, setUusKasutaja] = useState({
-        kasutajanimi: '',
-        parool: '',
-        eesnimi: '',
-        perenimi: '',
-    });
-    const [editMode, setEditMode] = useState(false);
-    const [kasutajaToEdit, setKasutajaToEdit] = useState(null);
+    const [users, setUsers] = useState([]);
+    const [products, setProducts] = useState([]);
 
-    // Получить список пользователей с API
+    // Kasutajate nimekirja laadimine
     useEffect(() => {
-        fetch('https://localhost:7198/api/kasutaja')
+        fetch('https://localhost:7198/api/Kasutaja')
             .then((response) => response.json())
-            .then((data) => setKasutajad(data))
-            .catch((error) => console.error('Viga:', error));
+            .then((data) => setUsers(data))
+            .catch((error) => console.error("Viga kasutajate laadimisel:", error));
     }, []);
 
-    // Добавить нового пользователя
-    const lisaKasutaja = (e) => {
-        e.preventDefault();
+    // Toodete nimekirja laadimine
+    useEffect(() => {
+        fetch('https://localhost:7198/tooted')
+            .then((response) => response.json())
+            .then((data) => setProducts(data))
+            .catch((error) => console.error("Viga toodete laadimisel:", error));
+    }, []);
 
-        fetch('https://localhost:7198/api/kasutaja', {
+    // Kasutaja lisamise funktsioon
+    const addUser = (user) => {
+        fetch('https://localhost:7198/api/Kasutaja', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(uusKasutaja),
+            body: JSON.stringify(user)
         })
             .then((response) => response.json())
-            .then((newUser) => {
-                setKasutajad([...kasutajad, newUser]);
-                setUusKasutaja({ kasutajanimi: '', parool: '', eesnimi: '', perenimi: '' }); // Очистить форму
-            })
-            .catch((error) => console.error('Viga:', error));
+            .then((newUser) => setUsers([...users, newUser]))
+            .catch((error) => console.error("Viga kasutaja lisamisel:", error));
     };
 
-    // Удалить пользователя
-    const kustutaKasutaja = (id) => {
-        fetch(`https://localhost:7198/api/kasutaja/${id}`, {
-            method: 'DELETE',
+    // Toote lisamise funktsioon
+    const addProduct = (product) => {
+        fetch('https://localhost:7198/tooted/lisa', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(product)
         })
-            .then(() => {
-                setKasutajad(kasutajad.filter((kasutaja) => kasutaja.id !== id));
-            })
-            .catch((error) => console.error('Viga:', error));
+            .then((response) => response.json())
+            .then((newProduct) => setProducts([...products, newProduct]))
+            .catch((error) => console.error("Viga toote lisamisel:", error));
     };
 
-    // Обновить пользователя
-    const uuendaKasutaja = (e) => {
-        e.preventDefault();
+    // Toote ostmise funktsioon
+    const buyProduct = (productId, userId) => {
+        fetch(`https://localhost:7198/tooted/osta/${productId}/${userId}`, {
+            method: 'POST'
+        })
+            .then((response) => response.json())
+            .then((data) => alert(data))
+            .catch((error) => console.error("Viga toote ostmisel:", error));
+    };
 
-        fetch(`https://localhost:7198/api/kasutaja/${kasutajaToEdit.id}`, {
+    // Toote uuendamise funktsioon
+    const updateProduct = (product) => {
+        fetch(`https://localhost:7198/tooted/${product.id}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(kasutajaToEdit),
+            body: JSON.stringify(product)
         })
-            .then(() => {
-                setKasutajad(kasutajad.map((kasutaja) =>
-                    kasutaja.id === kasutajaToEdit.id ? kasutajaToEdit : kasutaja
-                ));
-                setEditMode(false);
-                setKasutajaToEdit(null);
+            .then((response) => response.json())
+            .then((updatedProduct) => {
+                setProducts(products.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
             })
-            .catch((error) => console.error('Viga:', error));
+            .catch((error) => console.error("Viga toote uuendamisel:", error));
     };
 
-    // Включить режим редактирования
-    const startEditing = (kasutaja) => {
-        setEditMode(true);
-        setKasutajaToEdit({ ...kasutaja });
+    // Toote kustutamise funktsioon
+    const deleteProduct = (productId) => {
+        fetch(`https://localhost:7198/tooted/${productId}`, {
+            method: 'DELETE'
+        })
+            .then(() => {
+                setProducts(products.filter((p) => p.id !== productId));
+            })
+            .catch((error) => console.error("Viga toote kustutamisel:", error));
     };
 
     return (
         <div className="App">
-            <h1>Kasutajate loend</h1>
-            <ul>
-                {kasutajad.map((kasutaja) => (
-                    <li key={kasutaja.id}>
-                        {kasutaja.eesnimi} {kasutaja.perenimi} ({kasutaja.kasutajanimi})
-                        <button onClick={() => kustutaKasutaja(kasutaja.id)}>Kustuta</button>
-                        <button onClick={() => startEditing(kasutaja)}>Redigeeri</button>
-                    </li>
-                ))}
-            </ul>
-
-            {editMode ? (
-                <>
-                    <h2>Redigeeri kasutaja</h2>
-                    <form onSubmit={uuendaKasutaja}>
-                        <input
-                            type="text"
-                            placeholder="Kasutajanimi"
-                            value={kasutajaToEdit.kasutajanimi}
-                            onChange={(e) =>
-                                setKasutajaToEdit({ ...kasutajaToEdit, kasutajanimi: e.target.value })
-                            }
-                        />
-                        <input
-                            type="password"
-                            placeholder="Parool"
-                            value={kasutajaToEdit.parool}
-                            onChange={(e) =>
-                                setKasutajaToEdit({ ...kasutajaToEdit, parool: e.target.value })
-                            }
-                        />
-                        <input
-                            type="text"
-                            placeholder="Nimi"
-                            value={kasutajaToEdit.eesnimi}
-                            onChange={(e) =>
-                                setKasutajaToEdit({ ...kasutajaToEdit, eesnimi: e.target.value })
-                            }
-                        />
-                        <input
-                            type="text"
-                            placeholder="Perenimi"
-                            value={kasutajaToEdit.perenimi}
-                            onChange={(e) =>
-                                setKasutajaToEdit({ ...kasutajaToEdit, perenimi: e.target.value })
-                            }
-                        />
-                        <button type="submit">Uuendama</button>
-                    </form>
-                </>
-            ) : (
-                <>
-                    <h2>Lisa uus kasutaja</h2>
-                    <form onSubmit={lisaKasutaja}>
-                        <input
-                            type="text"
-                            placeholder="Kasutajanimi"
-                            value={uusKasutaja.kasutajanimi}
-                            onChange={(e) => setUusKasutaja({ ...uusKasutaja, kasutajanimi: e.target.value })}
-                        />
-                        <input
-                            type="password"
-                            placeholder="Parool"
-                            value={uusKasutaja.parool}
-                            onChange={(e) => setUusKasutaja({ ...uusKasutaja, parool: e.target.value })}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Nimi"
-                            value={uusKasutaja.eesnimi}
-                            onChange={(e) => setUusKasutaja({ ...uusKasutaja, eesnimi: e.target.value })}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Perenimi"
-                            value={uusKasutaja.perenimi}
-                            onChange={(e) => setUusKasutaja({ ...uusKasutaja, perenimi: e.target.value })}
-                        />
-                        <button type="submit">Lisa</button>
-                    </form>
-                </>
-            )}
+            <h1>Halduspaneel</h1>
+            <AddUser addUser={addUser} />
+            <AddProduct addProduct={addProduct} />
+            <UserList users={users} />
+            <h2>Tooted</h2>
+            {products.map((product) => (
+                <ProductActions
+                    key={product.id}
+                    product={product}
+                    users={users}
+                    buyProduct={buyProduct}
+                    updateProduct={updateProduct}
+                    deleteProduct={deleteProduct}
+                />
+            ))}
         </div>
     );
 }
